@@ -1,0 +1,27 @@
+# Rust Cargo
+# Compiled executables and shared objects
+/target/
+
+# Dependency archives
+# Crates often store temporary files here
+/Cargo.lock
+
+# Operating System Specific
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# IDE/Editor Specific
+# VS Code
+.vscode/
+
+# JetBrains IDEs (IntelliJ, CLion, RustRover)
+.idea/
+
+# Editor temporary files
+*~
+*.swp
+*.bak
+.cache/
