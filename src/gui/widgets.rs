@@ -5060,6 +5060,7 @@ pub struct ScrollView {
     pub scroll_offset: f32,
     pub content_height: f32,
     pub is_dragging_scrollbar: bool,
+    explicit_id: Option<String>,
 }
 
 impl ScrollView {
@@ -5070,7 +5071,13 @@ impl ScrollView {
             scroll_offset: 0.0,
             content_height: 0.0,
             is_dragging_scrollbar: false,
+            explicit_id: None,
         }
+    }
+
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.explicit_id = Some(id.into());
+        self
     }
 
     /// Check if a widget rect is visible in the viewport
@@ -5106,6 +5113,7 @@ impl ScrollView {
 
 impl Widget for ScrollView {
     fn draw(&mut self, ctx: &mut WidgetContext) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
         // Load state
         let state: ScrollViewState = ctx.get_state();
 
@@ -5145,9 +5153,11 @@ impl Widget for ScrollView {
 
             ctx.painter.draw_rect(thumb_rect, ctx.theme.colors.border);
         }
+        ctx.pop_explicit_id();
     }
 
     fn layout(&mut self, ctx: &mut WidgetContext, available_space: Rect) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
         // Load state
         let mut state: ScrollViewState = ctx.get_state();
 
@@ -5186,6 +5196,7 @@ impl Widget for ScrollView {
         ctx.push_path(0);
         self.child.layout(ctx, child_rect);
         ctx.pop_path();
+        ctx.pop_explicit_id();
     }
 
     fn size_hint(&self, _ctx: &mut WidgetContext, constraints: SizeConstraints) -> Vec2 {
@@ -5195,6 +5206,7 @@ impl Widget for ScrollView {
     }
 
     fn handle_event(&mut self, ctx: &mut WidgetContext, event: &Event) -> bool {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
         // Load state at start
         let mut state: ScrollViewState = ctx.get_state();
 
@@ -5209,6 +5221,7 @@ impl Widget for ScrollView {
                 ctx.pop_path();
 
                 if child_handled {
+                    ctx.pop_explicit_id();
                     return true;
                 }
 
@@ -5273,6 +5286,7 @@ impl Widget for ScrollView {
                         state.offset = self.scroll_offset;
                         state.dragging = self.is_dragging_scrollbar;
                         ctx.set_state(state);
+                        ctx.pop_explicit_id();
                         return true;
                     }
                 }
@@ -5285,6 +5299,7 @@ impl Widget for ScrollView {
                 if state.dragging {
                     // Only handle dragging if content_height is valid
                     if self.content_height == 0.0 || self.rect.size.y == 0.0 {
+                        ctx.pop_explicit_id();
                         return false;
                     }
                     let view_h = self.rect.size.y;
@@ -5332,10 +5347,12 @@ impl Widget for ScrollView {
 
         // Save state at end
         ctx.set_state(state);
+        ctx.pop_explicit_id();
         result
     }
 
     fn draw_overlay(&mut self, ctx: &mut WidgetContext) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
         // Draw overlay for child (dropdown menus, etc.) without scissor clipping
         // Overlays should render on top, so we clear any scissor from ScrollView
         let previous_scissor = ctx.painter.set_scissor(None);
@@ -5343,6 +5360,7 @@ impl Widget for ScrollView {
         self.child.draw_overlay(ctx);
         ctx.pop_path();
         ctx.painter.set_scissor(previous_scissor);
+        ctx.pop_explicit_id();
     }
 }
 
