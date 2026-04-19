@@ -39,7 +39,7 @@ Available widgets:
 - Slider
 - ProgressBar
 - TextInput
-- TextArea
+- TextArea (supports `with_id` for stable `WidgetStateStorage` keys, optional `font_size`)
 - Dropdown
 - ContextMenu (global or widget-scoped right-click menus)
 - Tabs (tabbed interface with multiple panels)

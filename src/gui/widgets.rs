@@ -2807,6 +2807,7 @@ pub struct TextArea {
     auto_height: Option<f32>,
     pub allow_tab: bool,
     pub vertical_anchor_x: Option<f32>,
+    explicit_id: Option<String>,
 }
 
 impl TextArea {
@@ -2858,7 +2859,18 @@ impl TextArea {
             auto_height: None,
             allow_tab: false,
             vertical_anchor_x: None,
+            explicit_id: None,
         }
+    }
+
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.explicit_id = Some(id.into());
+        self
+    }
+
+    pub fn font_size(mut self, size: f32) -> Self {
+        self.font_size = size;
+        self
     }
 
     pub fn on_change<F: FnMut(String) + 'static>(mut self, f: F) -> Self {
@@ -3428,6 +3440,8 @@ impl TextArea {
 
 impl Widget for TextArea {
     fn draw(&mut self, ctx: &mut WidgetContext) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
+
         let mut state: TextAreaState = ctx.get_state();
         self.text = state.text.clone();
         self.focused = state.focused;
@@ -3563,9 +3577,13 @@ impl Widget for TextArea {
         state.error_message = self.error_message.clone();
 
         ctx.set_state(state);
+
+        ctx.pop_explicit_id();
     }
 
     fn layout(&mut self, ctx: &mut WidgetContext, mut available_space: Rect) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
+
         let error_height = self.error_height(ctx);
         let content_space = (available_space.size.y - error_height).max(0.0);
         available_space.size.y = content_space;
@@ -3573,6 +3591,8 @@ impl Widget for TextArea {
         if let Some(desired) = self.preferred_height.or(self.auto_height) {
             self.rect.size.y = desired.min(content_space);
         }
+
+        ctx.pop_explicit_id();
     }
 
     fn size_hint(&self, ctx: &mut WidgetContext, constraints: SizeConstraints) -> Vec2 {
@@ -3596,6 +3616,8 @@ impl Widget for TextArea {
     }
 
     fn handle_event(&mut self, ctx: &mut WidgetContext, event: &Event) -> bool {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
+
         let mut state: TextAreaState = ctx.get_state();
 
         self.text = state.text.clone();
@@ -3977,6 +3999,9 @@ impl Widget for TextArea {
         self.error_visible = state.has_interacted && state.error_message.is_some();
 
         ctx.set_state(state);
+
+        ctx.pop_explicit_id();
+
         handled
     }
 }
