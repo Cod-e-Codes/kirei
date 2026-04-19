@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-arboard = "3.6.1"
-bytemuck = { version = "1.24.0", features = ["derive"] }
-env_logger = "0.11.8"
-glam = "0.30.9"
-glyphon = "0.9.0"
-image = "0.25.8"
-pollster = "0.4.0"
-wgpu = "25.0.2"
-winit = "0.30.12"
+arboard = "3.6"
+bytemuck = { version = "1.25", features = ["derive"] }
+env_logger = "0.11"
+glam = "0.30"
+glyphon = "0.9"
+image = "0.25"
+pollster = "0.4"
+wgpu = "25"
+winit = "0.30"
