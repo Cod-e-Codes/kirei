@@ -5251,6 +5251,9 @@ impl Widget for ScrollView {
                             self.scroll_offset = new_offset;
                         }
 
+                        state.offset = self.scroll_offset;
+                        state.dragging = self.is_dragging_scrollbar;
+                        ctx.set_state(state);
                         return true;
                     }
                 }

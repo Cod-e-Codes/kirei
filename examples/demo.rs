@@ -1,6 +1,4 @@
-use kirei::gui::core::{
-    DrawPass, FocusManager, Rect, Widget, WidgetContext, WidgetStateStorage,
-};
+use kirei::gui::core::{DrawPass, FocusManager, Rect, Widget, WidgetContext, WidgetStateStorage};
 use kirei::gui::renderer::{RenderContext, Renderer};
 use kirei::gui::theme::Theme;
 use kirei::gui::widgets::{
@@ -466,15 +464,16 @@ impl State {
             },
             WindowEvent::MouseInput {
                 state: ElementState::Released,
-                button,
+                button: MouseButton::Left,
                 ..
-            } => match button {
-                MouseButton::Left => {
-                    self.input_state.mouse_pressed = false;
-                    Some(GuiEvent::Release(self.input_state.mouse_pos))
-                }
-                _ => None,
-            },
+            } => {
+                self.input_state.mouse_pressed = false;
+                Some(GuiEvent::Release(self.input_state.mouse_pos))
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Released,
+                ..
+            } => None,
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
