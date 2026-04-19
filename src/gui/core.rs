@@ -73,6 +73,8 @@ pub trait Painter {
     fn draw_image(&mut self, rect: Rect, texture_id: usize);
     fn draw_text(&mut self, text: &str, pos: Vec2, color: [f32; 4], font_size: f32, wrap: Wrap);
     fn get_text_size(&mut self, text: &str, font_size: f32) -> Vec2;
+    /// Height of `text` when wrapped to `max_width`, using the same shaping as word-wrapped `draw_text`.
+    fn get_wrapped_text_size(&mut self, text: &str, font_size: f32, max_width: f32) -> Vec2;
     fn set_scissor(&mut self, rect: Option<Rect>) -> Option<Rect>;
     fn set_draw_pass(&mut self, pass: DrawPass);
 }

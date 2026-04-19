@@ -48,7 +48,7 @@ Available widgets:
 - Row (horizontal layout)
 - Panel (container)
 - Modal (centered dialog / popup overlay widget)
-- ScrollView (scrollable container with viewport culling)
+- ScrollView (scrollable container with viewport culling). Word-wrapped text uses the viewport width for wrapping and a large layout height so content below the first screen is still shaped; the scissor clips drawing to the viewport.
 - Tooltip (hover tooltip wrapper for any widget)
 
 ## Usage

@@ -1,5 +1,9 @@
 use crate::gui::core::{DrawPass, Painter, Rect};
 use glam::Vec2;
+
+/// Vertical extent passed to cosmic-text for layout. Must be much larger than any on-screen
+/// viewport so shaping includes lines below the first visible strip (scroll views clip separately).
+const TEXT_LAYOUT_MAX_HEIGHT: f32 = 1_000_000.0;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Resolution, Shaping, SwashCache, TextArea,
     TextAtlas, TextBounds, TextRenderer, Wrap,
@@ -144,6 +148,7 @@ pub struct Renderer {
 
     vertex_pool: Vec<Vec<GuiVertex>>, // Reusable vertex buffers
     text_size_cache: HashMap<(String, u32), Vec2>, // Cache for text measurements: (text, font_size_bits) -> size
+    wrapped_text_size_cache: HashMap<(String, u32, u32), Vec2>, // (text, font_size_bits, max_width_bits)
 }
 
 // Helper struct to hold text data until render
@@ -152,8 +157,11 @@ struct OwnedTextArea {
     pos: Vec2,
     color: [f32; 4],
     font_size: f32,
-    bounds_origin: Vec2,
-    bounds_size: Vec2,
+    /// Screen-space clip (usually the active scissor).
+    clip_origin: Vec2,
+    clip_size: Vec2,
+    /// Size passed to `Buffer::set_size` for wrapping (width from viewport; height unbounded).
+    layout_size: Vec2,
     wrap: Wrap,
     buffer: Option<Buffer>,
     hash: u64, // For change detection
@@ -167,10 +175,12 @@ impl OwnedTextArea {
         let mut hasher = DefaultHasher::new();
         self.text.hash(&mut hasher);
         self.font_size.to_bits().hash(&mut hasher);
-        self.bounds_origin.x.to_bits().hash(&mut hasher);
-        self.bounds_origin.y.to_bits().hash(&mut hasher);
-        self.bounds_size.x.to_bits().hash(&mut hasher);
-        self.bounds_size.y.to_bits().hash(&mut hasher);
+        self.clip_origin.x.to_bits().hash(&mut hasher);
+        self.clip_origin.y.to_bits().hash(&mut hasher);
+        self.clip_size.x.to_bits().hash(&mut hasher);
+        self.clip_size.y.to_bits().hash(&mut hasher);
+        self.layout_size.x.to_bits().hash(&mut hasher);
+        self.layout_size.y.to_bits().hash(&mut hasher);
         (self.wrap as u32).hash(&mut hasher);
         hasher.finish()
     }
@@ -383,6 +393,7 @@ impl Renderer {
             current_pass: DrawPass::Normal,
             vertex_pool: Vec::new(),
             text_size_cache: HashMap::new(),
+            wrapped_text_size_cache: HashMap::new(),
         }
     }
 
@@ -695,8 +706,8 @@ impl Renderer {
                 buffer.set_wrap(&mut self.font_system, area.wrap);
                 buffer.set_size(
                     &mut self.font_system,
-                    Some(area.bounds_size.x),
-                    Some(area.bounds_size.y),
+                    Some(area.layout_size.x),
+                    Some(area.layout_size.y),
                 );
                 buffer.set_text(
                     &mut self.font_system,
@@ -717,10 +728,10 @@ impl Renderer {
                 top: area.pos.y,
                 scale: 1.0,
                 bounds: TextBounds {
-                    left: (area.bounds_origin.x as i32),
-                    top: (area.bounds_origin.y as i32),
-                    right: (area.bounds_origin.x + area.bounds_size.x) as i32,
-                    bottom: (area.bounds_origin.y + area.bounds_size.y) as i32,
+                    left: (area.clip_origin.x as i32),
+                    top: (area.clip_origin.y as i32),
+                    right: (area.clip_origin.x + area.clip_size.x) as i32,
+                    bottom: (area.clip_origin.y + area.clip_size.y) as i32,
                 },
                 default_color: Color::rgba(
                     (area.color[0] * 255.0) as u8,
@@ -943,7 +954,7 @@ impl Painter for Renderer {
     }
 
     fn draw_text(&mut self, text: &str, pos: Vec2, color: [f32; 4], font_size: f32, wrap: Wrap) {
-        let (bounds_origin, bounds_size) = if let Some(rect) = self.current_scissor {
+        let (clip_origin, clip_size) = if let Some(rect) = self.current_scissor {
             (rect.pos, rect.size)
         } else {
             // When scissor is None (overlay mode), use very large bounds to prevent clipping
@@ -951,14 +962,18 @@ impl Painter for Renderer {
             (Vec2::new(0.0, 0.0), Vec2::new(10000.0, 10000.0))
         };
 
+        let layout_width = clip_size.x.max(1.0);
+        let layout_size = Vec2::new(layout_width, TEXT_LAYOUT_MAX_HEIGHT);
+
         // Create temporary OwnedTextArea to calculate hash
         let area = OwnedTextArea {
             text: text.to_string(),
             pos,
             color,
             font_size,
-            bounds_origin,
-            bounds_size,
+            clip_origin,
+            clip_size,
+            layout_size,
             wrap,
             buffer: None,
             hash: 0, // Will be calculated
@@ -971,8 +986,9 @@ impl Painter for Renderer {
             pos,
             color,
             font_size,
-            bounds_origin,
-            bounds_size,
+            clip_origin,
+            clip_size,
+            layout_size,
             wrap,
             buffer: None,
             hash,
@@ -1019,6 +1035,42 @@ impl Painter for Renderer {
         // Store in cache
         self.text_size_cache.insert(key, size);
 
+        size
+    }
+
+    fn get_wrapped_text_size(&mut self, text: &str, font_size: f32, max_width: f32) -> Vec2 {
+        let mw = max_width.max(1.0);
+        let key = (text.to_string(), font_size.to_bits(), mw.to_bits());
+        if let Some(&size) = self.wrapped_text_size_cache.get(&key) {
+            return size;
+        }
+
+        let mut buffer = Buffer::new(
+            &mut self.font_system,
+            Metrics::new(font_size, font_size * 1.2),
+        );
+        buffer.set_wrap(&mut self.font_system, Wrap::Word);
+        buffer.set_size(
+            &mut self.font_system,
+            Some(mw),
+            Some(TEXT_LAYOUT_MAX_HEIGHT),
+        );
+        buffer.set_text(
+            &mut self.font_system,
+            text,
+            &Attrs::new().family(Family::SansSerif),
+            Shaping::Advanced,
+        );
+
+        let mut w: f32 = 0.0;
+        let mut h: f32 = 0.0;
+        for run in buffer.layout_runs() {
+            w = w.max(run.line_w);
+            h += run.line_height;
+        }
+
+        let size = Vec2::new(w.min(mw), h.max(font_size));
+        self.wrapped_text_size_cache.insert(key, size);
         size
     }
 
