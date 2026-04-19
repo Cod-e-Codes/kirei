@@ -1,15 +1,29 @@
 use crate::gui::core::{DrawPass, Painter, Rect};
 use glam::Vec2;
-
-/// Vertical extent passed to cosmic-text for layout. Must be much larger than any on-screen
-/// viewport so shaping includes lines below the first visible strip (scroll views clip separately).
-const TEXT_LAYOUT_MAX_HEIGHT: f32 = 1_000_000.0;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Resolution, Shaping, SwashCache, TextArea,
     TextAtlas, TextBounds, TextRenderer, Wrap,
 };
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
+
+/// Map a widget content size to cosmic-text `Buffer::set_size` options. Non-finite `y` means
+/// unbounded vertical layout (all lines are shaped).
+fn cosmic_text_buffer_size(layout_size: Vec2) -> (Option<f32>, Option<f32>) {
+    let w = if layout_size.x.is_finite() {
+        Some(layout_size.x.max(1.0))
+    } else {
+        Some(1.0)
+    };
+    let h = if !layout_size.y.is_finite() {
+        None
+    } else if layout_size.y <= 0.0 {
+        Some(1.0)
+    } else {
+        Some(layout_size.y)
+    };
+    (w, h)
+}
 
 #[derive(Debug)]
 pub enum GuiError {
@@ -704,11 +718,8 @@ impl Renderer {
                     Metrics::new(area.font_size, area.font_size * 1.2),
                 );
                 buffer.set_wrap(&mut self.font_system, area.wrap);
-                buffer.set_size(
-                    &mut self.font_system,
-                    Some(area.layout_size.x),
-                    Some(area.layout_size.y),
-                );
+                let (lw, lh) = cosmic_text_buffer_size(area.layout_size);
+                buffer.set_size(&mut self.font_system, lw, lh);
                 buffer.set_text(
                     &mut self.font_system,
                     &area.text,
@@ -953,7 +964,15 @@ impl Painter for Renderer {
         self.push_vertices(vertices, texture_id);
     }
 
-    fn draw_text(&mut self, text: &str, pos: Vec2, color: [f32; 4], font_size: f32, wrap: Wrap) {
+    fn draw_text(
+        &mut self,
+        text: &str,
+        pos: Vec2,
+        color: [f32; 4],
+        font_size: f32,
+        wrap: Wrap,
+        layout_size: Vec2,
+    ) {
         let (clip_origin, clip_size) = if let Some(rect) = self.current_scissor {
             (rect.pos, rect.size)
         } else {
@@ -961,9 +980,6 @@ impl Painter for Renderer {
             // Use (0,0) as origin and very large size to cover entire screen
             (Vec2::new(0.0, 0.0), Vec2::new(10000.0, 10000.0))
         };
-
-        let layout_width = clip_size.x.max(1.0);
-        let layout_size = Vec2::new(layout_width, TEXT_LAYOUT_MAX_HEIGHT);
 
         // Create temporary OwnedTextArea to calculate hash
         let area = OwnedTextArea {
@@ -1050,11 +1066,8 @@ impl Painter for Renderer {
             Metrics::new(font_size, font_size * 1.2),
         );
         buffer.set_wrap(&mut self.font_system, Wrap::Word);
-        buffer.set_size(
-            &mut self.font_system,
-            Some(mw),
-            Some(TEXT_LAYOUT_MAX_HEIGHT),
-        );
+        let (lw, lh) = cosmic_text_buffer_size(Vec2::new(mw, f32::INFINITY));
+        buffer.set_size(&mut self.font_system, lw, lh);
         buffer.set_text(
             &mut self.font_system,
             text,

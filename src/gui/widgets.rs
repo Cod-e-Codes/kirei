@@ -1,4 +1,6 @@
-use crate::gui::core::{Event, Rect, SizeConstraints, Widget, WidgetContext};
+use crate::gui::core::{
+    Event, Rect, SizeConstraints, Widget, WidgetContext, text_layout_height_unbounded,
+};
 use glam::Vec2;
 use glyphon::Wrap;
 use std::sync::{Arc, Mutex};
@@ -122,8 +124,9 @@ impl Widget for Label {
         let state: LabelState = ctx.get_state();
         let text = state.text.unwrap_or(default_text);
 
+        let layout_sz = Vec2::new(self.rect.size.x.max(1.0), self.rect.size.y.max(1.0));
         ctx.painter
-            .draw_text(&text, pos, color, font_size, Wrap::Word);
+            .draw_text(&text, pos, color, font_size, Wrap::Word, layout_sz);
 
         ctx.pop_explicit_id();
     }
@@ -235,6 +238,7 @@ impl Widget for Button {
             text_color,
             ctx.theme.font.size_body,
             Wrap::Word,
+            inner_rect.size,
         );
 
         ctx.pop_explicit_id();
@@ -392,12 +396,17 @@ impl Widget for Checkbox {
             self.rect.pos.x + box_size + ctx.theme.metrics.spacing,
             self.rect.pos.y + (self.rect.size.y - ctx.theme.font.size_body) / 2.0,
         );
+        let label_layout = Vec2::new(
+            (self.rect.size.x - box_size - ctx.theme.metrics.spacing).max(1.0),
+            self.rect.size.y.max(1.0),
+        );
         ctx.painter.draw_text(
             &self.label,
             text_pos,
             ctx.theme.colors.text,
             ctx.theme.font.size_body,
             Wrap::Word,
+            label_layout,
         );
     }
 
@@ -598,12 +607,17 @@ impl Widget for RadioButtons {
                 indicator_rect.pos.x + indicator_size + ctx.theme.metrics.spacing,
                 option_rect.pos.y + (option_rect.size.y - ctx.theme.font.size_body) / 2.0,
             );
+            let label_layout = Vec2::new(
+                (option_rect.size.x - indicator_size - ctx.theme.metrics.spacing).max(1.0),
+                option_rect.size.y.max(1.0),
+            );
             ctx.painter.draw_text(
                 option,
                 text_pos,
                 ctx.theme.colors.text,
                 ctx.theme.font.size_body,
                 Wrap::Word,
+                label_layout,
             );
         }
 
@@ -767,6 +781,12 @@ impl Widget for Dropdown {
             self.placeholder.as_deref().unwrap_or("Select...")
         };
 
+        let arrow_size = 8.0;
+        let field_text_layout = Vec2::new(
+            (inner_rect.size.x - padding * 2.0 - arrow_size).max(1.0),
+            inner_rect.size.y.max(1.0),
+        );
+
         let text_size = ctx
             .painter
             .get_text_size(display_text, ctx.theme.font.size_body);
@@ -787,10 +807,10 @@ impl Widget for Dropdown {
             text_color,
             ctx.theme.font.size_body,
             Wrap::Word,
+            field_text_layout,
         );
 
         // Draw dropdown arrow
-        let arrow_size = 8.0;
         let arrow_x = self.rect.pos.x + self.rect.size.x - padding - arrow_size;
         let arrow_y = self.rect.pos.y + (self.rect.size.y - arrow_size) / 2.0;
         let arrow_rect = Rect::new(arrow_x, arrow_y, arrow_size, arrow_size);
@@ -915,6 +935,7 @@ impl Widget for Dropdown {
                     ctx.theme.colors.text,
                     ctx.theme.font.size_body,
                     Wrap::Word,
+                    item_rect.size,
                 );
             }
 
@@ -1484,6 +1505,7 @@ impl Widget for ContextMenu {
                 text_color,
                 ctx.theme.font.size_body,
                 Wrap::None,
+                item_rect.size,
             );
 
             if let Some(shortcut) = &item.shortcut {
@@ -1500,6 +1522,7 @@ impl Widget for ContextMenu {
                     ctx.theme.colors.text_dim,
                     ctx.theme.font.size_small,
                     Wrap::None,
+                    item_rect.size,
                 );
             }
         }
@@ -2300,6 +2323,7 @@ impl Widget for TextInput {
             text_color,
             ctx.theme.font.size_body,
             Wrap::None,
+            inner_rect.size,
         );
 
         // Draw IME composition text if active
@@ -2322,6 +2346,7 @@ impl Widget for TextInput {
                 ctx.theme.colors.primary,
                 ctx.theme.font.size_body,
                 Wrap::None,
+                inner_rect.size,
             );
         }
 
@@ -2356,7 +2381,8 @@ impl Widget for TextInput {
                 text_pos,
                 ctx.theme.colors.error,
                 ctx.theme.font.size_small,
-                Wrap::None,
+                Wrap::Word,
+                Vec2::new(self.rect.size.x.max(1.0), text_layout_height_unbounded()),
             );
         }
 
@@ -3369,12 +3395,17 @@ impl TextArea {
             if line_bottom < view_top || line_top > view_bottom {
                 continue;
             }
+            let line_layout = Vec2::new(
+                (inner_rect.size.x - Self::PADDING_X * 2.0).max(1.0),
+                self.line_height(),
+            );
             ctx.painter.draw_text(
                 &line.text,
                 Vec2::new(text_origin.x, line_top),
                 ctx.theme.colors.text,
                 self.font_size,
                 Wrap::None,
+                line_layout,
             );
         }
     }
@@ -3437,12 +3468,17 @@ impl Widget for TextArea {
 
         let placeholder_active = self.text.is_empty() && !self.focused;
         if placeholder_active {
+            let hint_layout = Vec2::new(
+                (inner_rect.size.x - Self::PADDING_X * 2.0).max(1.0),
+                inner_rect.size.y.max(1.0),
+            );
             ctx.painter.draw_text(
                 &self.hint,
                 Vec2::new(text_origin.x, inner_rect.pos.y + Self::PADDING_Y),
                 ctx.theme.colors.text_dim,
                 self.font_size,
                 Wrap::Word,
+                hint_layout,
             );
         } else {
             self.draw_selection(ctx, &inner_rect, text_origin);
@@ -3459,6 +3495,7 @@ impl Widget for TextArea {
                 ctx.theme.colors.primary,
                 self.font_size,
                 Wrap::None,
+                inner_rect.size,
             );
         }
 
@@ -3487,7 +3524,8 @@ impl Widget for TextArea {
                 text_pos,
                 ctx.theme.colors.error,
                 ctx.theme.font.size_small,
-                Wrap::None,
+                Wrap::Word,
+                Vec2::new(self.rect.size.x.max(1.0), text_layout_height_unbounded()),
             );
         }
 
@@ -4743,6 +4781,7 @@ impl Widget for Tabs {
                 text_color,
                 ctx.theme.font.size_body,
                 Wrap::None,
+                rect.size,
             );
 
             if is_selected {
@@ -5512,6 +5551,7 @@ impl Widget for Tooltip {
                 ctx.theme.colors.text,
                 ctx.theme.font.size_small,
                 glyphon::Wrap::Word,
+                inner_rect.size,
             );
 
             // Restore previous scissor

@@ -15,6 +15,9 @@ use winit::{
     window::{Window, WindowId},
 };
 
+// Custom widgets that call Painter::draw_text must supply layout_size (the laid-out content
+// box). Scissor clips output; layout_size drives shaping. See gui::core::Painter.
+
 // Input State
 struct InputState {
     mouse_pos: glam::Vec2,

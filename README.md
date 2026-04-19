@@ -48,7 +48,11 @@ Available widgets:
 - Row (horizontal layout)
 - Panel (container)
 - Modal (centered dialog / popup overlay widget)
-- ScrollView (scrollable container with viewport culling). Word-wrapped text uses the viewport width for wrapping and a large layout height so content below the first screen is still shaped; the scissor clips drawing to the viewport.
+- ScrollView (scrollable container with viewport culling)
+
+### Text layout vs clipping
+
+`Painter::draw_text` takes an explicit `layout_size` for cosmic-text shaping (wrap width and vertical extent). That must be the widget content size from layout, not the scroll viewport. The active scissor only clips pixels. For intrinsic height only (for example `get_wrapped_text_size`), use `text_layout_height_unbounded` as the `y` component of `layout_size`. Built-in widgets already pass the correct sizes.
 - Tooltip (hover tooltip wrapper for any widget)
 
 ## Usage
