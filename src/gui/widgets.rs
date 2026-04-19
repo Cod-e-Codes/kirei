@@ -1807,6 +1807,7 @@ pub struct TextInput {
     display_text: String,               // Cached display string (masked or plain)
     password_visibility: Option<Arc<Mutex<bool>>>, // Shared toggle to reveal password
     last_mask_state: bool,              // Tracks last mask state to refresh layout when toggled
+    explicit_id: Option<String>,
 }
 
 impl TextInput {
@@ -1850,7 +1851,13 @@ impl TextInput {
             display_text: String::new(),
             password_visibility: None,
             last_mask_state: false,
+            explicit_id: None,
         }
+    }
+
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.explicit_id = Some(id.into());
+        self
     }
 
     pub fn password(hint: impl Into<String>) -> Self {
@@ -2173,6 +2180,8 @@ impl TextInput {
 
 impl Widget for TextInput {
     fn draw(&mut self, ctx: &mut WidgetContext) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
+
         // Update character positions only if needed
         self.update_char_positions(ctx);
 
@@ -2350,9 +2359,13 @@ impl Widget for TextInput {
                 Wrap::None,
             );
         }
+
+        ctx.pop_explicit_id();
     }
 
     fn layout(&mut self, ctx: &mut WidgetContext, mut available_space: Rect) {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
+
         let base_height = self.base_height(ctx);
         let error_height = self.error_height(ctx);
         let mut input_height = (available_space.size.y - error_height).max(0.0);
@@ -2364,6 +2377,8 @@ impl Widget for TextInput {
         if self.is_focusable() {
             ctx.focus_manager.register_focusable(ctx.current_id());
         }
+
+        ctx.pop_explicit_id();
     }
 
     fn size_hint(&self, ctx: &mut WidgetContext, constraints: SizeConstraints) -> Vec2 {
@@ -2373,6 +2388,8 @@ impl Widget for TextInput {
     }
 
     fn handle_event(&mut self, ctx: &mut WidgetContext, event: &Event) -> bool {
+        ctx.push_explicit_id(self.explicit_id.as_deref());
+
         // Load state at start
         let mut state: TextInputState = ctx.get_state();
 
@@ -2562,6 +2579,7 @@ impl Widget for TextInput {
                                 self.selection_start = None;
                                 state.selection_start = None;
                                 ctx.set_state(state);
+                                ctx.pop_explicit_id();
                                 return true; // Consume Tab event and exit early
                             }
                             Key::Named(NamedKey::Backspace) => {
@@ -2711,6 +2729,7 @@ impl Widget for TextInput {
 
         // Save state at end
         ctx.set_state(state);
+        ctx.pop_explicit_id();
         result
     }
 
