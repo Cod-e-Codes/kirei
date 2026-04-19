@@ -8,15 +8,25 @@ kirei provides a widget-based GUI system with GPU-accelerated rendering. It incl
 
 ## Dependencies
 
-- wgpu 25.0.2 - GPU rendering
-- winit 0.30.12 - Window management
-- glyphon 0.9.0 - Text rendering
-- glam 0.30.9 - Math types
-- arboard 3.6.1 - Clipboard operations
-- bytemuck 1.24.0 - GPU data serialization
-- image 0.25.8 - Image loading
-- env_logger 0.11.8 - Logging
-- pollster 0.4.0 - Async runtime
+Version requirements live in `Cargo.toml` (semver-compatible ranges, not pinned patch versions). The resolved dependency graph is in `Cargo.lock` after you run `cargo update`.
+
+Inspect what gets built:
+
+```bash
+cargo tree -p kirei -e normal
+```
+
+Refresh lockfile to the newest releases allowed by those ranges:
+
+```bash
+cargo update
+```
+
+Bump the version fields in `Cargo.toml` to newer compatible releases (requires [cargo-edit](https://github.com/killercup/cargo-edit)):
+
+```bash
+cargo upgrade
+```
 
 ## Widgets
 
@@ -75,11 +85,11 @@ cargo build --examples --release
 
 ### Development
 
-Format code and run linter:
+Format code and run the linter:
 
 ```bash
 cargo fmt
-cargo clippy
+cargo clippy --all-targets
 ```
 
 ## Architecture
@@ -142,7 +152,7 @@ let slider_id = WidgetId::from_key("volume_slider");
 let state: SliderState = widget_state.get_or_default(slider_id);
 ```
 
-Without explicit IDs, widget state is tied to tree position and breaks when the UI structure changes. Currently supported on: `Label`, `Button`, `Slider`.
+Without explicit IDs, widget state is tied to tree position and breaks when the UI structure changes. Currently supported on: `Label`, `Button`, `Slider`, `TextInput`.
 
 ### Layout System
 
