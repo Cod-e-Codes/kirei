@@ -2209,11 +2209,15 @@ impl Widget for TextInput {
         self.update_char_positions(ctx);
 
         // Load state
-        let state: TextInputState = ctx.get_state();
+        let mut state: TextInputState = ctx.get_state();
+        // FocusManager is authoritative for Tab order; widget state can lag until the next input
+        // event if focus moved programmatically. Sync before drawing the focus ring.
+        let id = ctx.current_id();
+        state.focused = ctx.focus_manager.has_focus(id);
+        self.focused = state.focused;
         // Sync widget fields from state
         self.text = state.text.clone();
         self.cursor_pos = state.cursor_pos;
-        self.focused = state.focused;
         self.selection_start = state.selection_start;
         self.error_message = state.error_message.clone();
         let is_hovered = state.hovered;
@@ -2386,6 +2390,10 @@ impl Widget for TextInput {
             );
         }
 
+        let mut persisted: TextInputState = ctx.get_state();
+        persisted.focused = self.focused;
+        ctx.set_state(persisted);
+
         ctx.pop_explicit_id();
     }
 
@@ -2448,6 +2456,7 @@ impl Widget for TextInput {
                 self.focused = state.focused;
 
                 if self.focused {
+                    ctx.focus_manager.set_focus(Some(ctx.current_id()));
                     // Position cursor at click location
                     self.cursor_pos = self.get_cursor_pos_from_mouse(pos.x);
                     state.cursor_pos = self.cursor_pos;
@@ -2457,6 +2466,9 @@ impl Widget for TextInput {
                     needs_scroll_update = true;
                     true
                 } else {
+                    if was_focused && ctx.focus_manager.get_focused() == Some(ctx.current_id()) {
+                        ctx.focus_manager.set_focus(None);
+                    }
                     // Lost focus, clear selection
                     self.selection_start = None;
                     state.selection_start = None;
@@ -3444,6 +3456,8 @@ impl Widget for TextArea {
 
         let mut state: TextAreaState = ctx.get_state();
         self.text = state.text.clone();
+        let aid = ctx.current_id();
+        state.focused = ctx.focus_manager.has_focus(aid);
         self.focused = state.focused;
         self.cursor_pos = state.cursor_pos.min(self.text.chars().count());
         self.selection_start = state.selection_start;
@@ -3592,6 +3606,10 @@ impl Widget for TextArea {
             self.rect.size.y = desired.min(content_space);
         }
 
+        if self.is_focusable() {
+            ctx.focus_manager.register_focusable(ctx.current_id());
+        }
+
         ctx.pop_explicit_id();
     }
 
@@ -3666,6 +3684,7 @@ impl Widget for TextArea {
                     self.focused = state.focused;
 
                     if self.focused {
+                        ctx.focus_manager.set_focus(Some(ctx.current_id()));
                         self.cursor_pos = self.cursor_from_point(*pos, text_origin);
                         state.cursor_pos = self.cursor_pos;
                         self.selection_start = Some(self.cursor_pos);
@@ -3674,6 +3693,10 @@ impl Widget for TextArea {
                         needs_scroll_update = true;
                         true
                     } else {
+                        if was_focused && ctx.focus_manager.get_focused() == Some(ctx.current_id())
+                        {
+                            ctx.focus_manager.set_focus(None);
+                        }
                         self.selection_start = None;
                         state.selection_start = None;
                         self.is_dragging = false;
@@ -3940,7 +3963,19 @@ impl Widget for TextArea {
                                     }
                                     true
                                 } else {
-                                    false
+                                    if modifiers.shift {
+                                        ctx.focus_manager.focus_prev();
+                                    } else {
+                                        ctx.focus_manager.focus_next();
+                                    }
+                                    ctx.request_redraw();
+                                    state.focused = false;
+                                    self.focused = false;
+                                    state.selection_start = None;
+                                    self.selection_start = None;
+                                    ctx.set_state(state);
+                                    ctx.pop_explicit_id();
+                                    return true;
                                 }
                             }
                             _ => false,
@@ -3998,11 +4033,20 @@ impl Widget for TextArea {
         state.error_message = self.error_message.clone();
         self.error_visible = state.has_interacted && state.error_message.is_some();
 
+        if !self.focused && ctx.focus_manager.has_focus(ctx.current_id()) {
+            state.focused = true;
+            self.focused = true;
+        }
+
         ctx.set_state(state);
 
         ctx.pop_explicit_id();
 
         handled
+    }
+
+    fn is_focusable(&self) -> bool {
+        true
     }
 }
 

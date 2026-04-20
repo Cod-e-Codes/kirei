@@ -49,11 +49,11 @@ Available widgets:
 - Panel (container)
 - Modal (centered dialog / popup overlay widget)
 - ScrollView (scrollable container with viewport culling)
+- Tooltip (hover tooltip wrapper for any widget)
 
 ### Text layout vs clipping
 
 `Painter::draw_text` takes an explicit `layout_size` for cosmic-text shaping (wrap width and vertical extent). That must be the widget content size from layout, not the scroll viewport. The active scissor only clips pixels. For intrinsic height only (for example `get_wrapped_text_size`), use `text_layout_height_unbounded` as the `y` component of `layout_size`. Built-in widgets already pass the correct sizes.
-- Tooltip (hover tooltip wrapper for any widget)
 
 ## Usage
 
@@ -133,14 +133,7 @@ Widgets use a centralized state management system:
 
 ### Focus Management
 
-The library includes keyboard focus management for accessible navigation:
-- **Tab Navigation**: Press Tab to cycle forward through focusable widgets, Shift+Tab to cycle backward
-- **Focus Chain**: Automatically built during layout from widgets that implement `is_focusable()`
-- **Visual Indicators**: Focused widgets display focus rings for keyboard navigation clarity
-- **Focusable Widgets**: Currently includes `TextInput` and `TextArea`
-- **Focus Manager**: Centralized `FocusManager` tracks focus state and handles keyboard navigation
-
-**Known Issue**: Tab navigation requires mouse movement or rapid key presses to trigger - single Tab key presses may not immediately change focus without additional input events.
+`FocusManager` tracks keyboard focus and builds tab order during layout from widgets whose `Widget` impl returns true from `is_focusable()`. `TextInput` and `TextArea` register and participate in Tab (forward) and Shift+Tab (backward). On draw, those widgets sync their stored focus flag from `FocusManager`, so focus rings update on the next frame after a single Tab without needing another event. Mouse press inside a focusable control updates `FocusManager`; press outside clears manager focus when that control had it. For `TextArea`, `allow_tab` switches between inserting a tab character and moving focus.
 
 #### Widget ID Management
 
